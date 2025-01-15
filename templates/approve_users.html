@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">用户审批</h2>
+    
+    {% if users %}
+        <div class="list-group">
+            {% for user in users %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-1">{{ user.email }}</h5>
+                        <small class="text-muted">注册时间：{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    <a href="{{ url_for('approve_user', user_id=user.id) }}" class="btn btn-success btn-sm">
+                        批准
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            当前没有待审批的用户
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

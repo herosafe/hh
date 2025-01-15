@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title">欢迎使用OA办公系统</h2>
+                <p class="card-text">
+                    本系统旨在提高办公效率，提供以下主要功能：
+                </p>
+                <ul>
+                    <li>公告发布与管理</li>
+                    <li>日程安排与提醒</li>
+                    <li>文件共享与下载</li>
+                    <li>用户权限管理</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                快速访问
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/announcements" class="btn btn-outline-primary">
+                        <i class="fas fa-bullhorn"></i> 查看公告
+                    </a>
+                    <a href="/schedule" class="btn btn-outline-primary">
+                        <i class="fas fa-calendar-alt"></i> 查看日程
+                    </a>
+                    <a href="/files" class="btn btn-outline-primary">
+                        <i class="fas fa-file-upload"></i> 文件共享
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
