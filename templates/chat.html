@@ -118,13 +118,21 @@
         // 添加私聊标识
         const privateLabel = data.is_private ? '<span class="badge bg-dark me-2">私聊</span>' : '';
         
+        // 格式化时间
+        const timestamp = new Date(data.timestamp);
+        const formattedTime = timestamp.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
         messageElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <div>
                     ${privateLabel}
                     <strong>${data.sender}</strong>
                 </div>
-                <small class="text-muted">${data.timestamp}</small>
+                <small class="text-muted">${formattedTime}</small>
             </div>
             <div>${data.message}</div>
         `;
