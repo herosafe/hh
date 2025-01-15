@@ -17,15 +17,18 @@
         </div>
         <div class="col-md-9">
             <div class="card">
-                <div class="card-header" id="chat-header">
-                    请选择一个用户开始聊天
+                <div class="card-header d-flex justify-content-between align-items-center" id="chat-header">
+                    <span>全局聊天</span>
+                    <button class="btn btn-sm btn-outline-secondary" id="toggle-chat-mode">
+                        切换到私聊
+                    </button>
                 </div>
                 <div class="card-body chat-box" style="height: 400px; width: 99%; overflow-y: scroll;">
                     <div id="messages"></div>
                 </div>
                 <div class="card-footer">
                     <div class="input-group">
-                        <input type="text" id="message-input" class="form-control" placeholder="请先选择一个用户开始聊天">
+                        <input type="text" id="message-input" class="form-control" placeholder="输入消息...">
                         <button class="btn btn-primary" id="send-btn">发送</button>
                     </div>
                 </div>
@@ -39,66 +42,56 @@
     const socket = io();
     let currentRoom = null;
     let currentUserId = parseInt("{{ current_user.id }}");
+    let isPrivateChat = false;
 
-    // 处理开始聊天
-    document.querySelectorAll('.start-chat').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const userId = this.dataset.userId;
-            const userEmail = this.dataset.userEmail;
-            
-            // 创建或加入聊天室
-            currentRoom = `room_${Math.min(currentUserId, userId)}_${Math.max(currentUserId, userId)}`;
-            socket.emit('join', {room: currentRoom});
-            
-            // 更新UI
-            document.getElementById('chat-header').textContent = `正在与 ${userEmail} 聊天`;
-            document.getElementById('message-input').focus();
-            document.getElementById('message-input').placeholder = "输入消息...";
-            
-            // 加载历史消息
-            fetch(`/chat/history/${currentRoom}`)
-                .then(response => response.json())
-                .then(messages => {
-                    const messagesDiv = document.getElementById('messages');
-                    messagesDiv.innerHTML = '';
-                    messages.forEach(msg => {
-                        const messageElement = document.createElement('div');
-                        messageElement.className = `alert ${msg.sender_id == currentUserId ? 'alert-primary' : 'alert-secondary'} p-2 mb-2`;
-                        messageElement.style.maxWidth = '70%';
-                        messageElement.style.marginLeft = msg.sender_id == currentUserId ? 'auto' : '0';
-                        messageElement.innerHTML = `
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <strong>${msg.sender.email}</strong>
-                                <small class="text-muted">${new Date(msg.timestamp).toLocaleTimeString()}</small>
-                            </div>
-                            <div>${msg.content}</div>
-                        `;
-                        messagesDiv.appendChild(messageElement);
-                    });
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                });
-        });
+    // 切换聊天模式
+    document.getElementById('toggle-chat-mode').addEventListener('click', function() {
+        isPrivateChat = !isPrivateChat;
+        currentRoom = null;
+        document.getElementById('chat-header').children[0].textContent = isPrivateChat ? '私聊模式' : '全局聊天';
+        this.textContent = isPrivateChat ? '切换到全局' : '切换到私聊';
+        document.getElementById('message-input').placeholder = isPrivateChat ? '请选择一个用户开始私聊' : '输入消息...';
     });
 
-    // 处理回车键发送消息
-    document.getElementById('message-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            document.getElementById('send-btn').click();
-        }
-    });
+    // 处理开始私聊
+    function startPrivateChat(userId, userEmail) {
+        if (!isPrivateChat) return;
+        
+        currentRoom = `room_${Math.min(currentUserId, userId)}_${Math.max(currentUserId, userId)}`;
+        socket.emit('join', {room: currentRoom});
+        
+        document.getElementById('chat-header').children[0].textContent = `正在与 ${userEmail} 私聊`;
+        document.getElementById('message-input').focus();
+    }
 
     // 处理发送消息
-    document.getElementById('send-btn').addEventListener('click', function() {
+    function sendMessage() {
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
         
-        if (message && currentRoom) {
+        if (message) {
+            if (isPrivateChat && !currentRoom) {
+                alert('请先选择一个用户开始私聊');
+                return;
+            }
+
             socket.emit('message', {
-                room: currentRoom,
-                message: message
+                room: isPrivateChat ? currentRoom : 'global_chat',
+                message: message,
+                is_private: isPrivateChat
             });
             messageInput.value = '';
+        }
+    }
+
+    // 点击发送按钮
+    document.getElementById('send-btn').addEventListener('click', sendMessage);
+
+    // 回车键发送消息
+    document.getElementById('message-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // 阻止默认行为（换行）
+            sendMessage();
         }
     });
 
@@ -106,18 +99,44 @@
     socket.on('message', function(data) {
         const messagesDiv = document.getElementById('messages');
         const messageElement = document.createElement('div');
-        messageElement.className = `alert ${data.sender == "{{ current_user.email }}" ? 'alert-primary' : 'alert-secondary'} p-2 mb-2`;
+        
+        // 设置消息样式
+        let alertClass = 'alert-secondary';
+        let align = '0';
+        
+        if (data.sender == "{{ current_user.email }}") {
+            alertClass = data.is_private ? 'alert-info' : 'alert-primary';
+            align = 'auto';
+        } else {
+            alertClass = data.is_private ? 'alert-warning' : 'alert-secondary';
+        }
+        
+        messageElement.className = `alert ${alertClass} p-2 mb-2`;
         messageElement.style.maxWidth = '70%';
-        messageElement.style.marginLeft = data.sender == "{{ current_user.email }}" ? 'auto' : '0';
+        messageElement.style.marginLeft = align;
+        
+        // 添加私聊标识
+        const privateLabel = data.is_private ? '<span class="badge bg-dark me-2">私聊</span>' : '';
+        
         messageElement.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-1">
-                <strong>${data.sender}</strong>
+                <div>
+                    ${privateLabel}
+                    <strong>${data.sender}</strong>
+                </div>
                 <small class="text-muted">${data.timestamp}</small>
             </div>
             <div>${data.message}</div>
         `;
+        
         messagesDiv.appendChild(messageElement);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // 自动滚动到底部
+        messagesDiv.scrollTo({
+            top: messagesDiv.scrollHeight,
+            behavior: 'smooth'
+        });
 
         // 消息提醒
         if (Notification.permission === 'granted' && !document.hasFocus()) {
@@ -131,11 +150,6 @@
             };
         }
     });
-
-    // 请求通知权限
-    if (Notification.permission !== 'granted') {
-        Notification.requestPermission();
-    }
 
     // 更新在线用户列表
     function updateOnlineUsers(users) {
@@ -172,38 +186,7 @@
                 e.preventDefault();
                 const userId = this.dataset.userId;
                 const userEmail = this.dataset.userEmail;
-                
-                // 创建或加入聊天室
-                currentRoom = `room_${Math.min(currentUserId, userId)}_${Math.max(currentUserId, userId)}`;
-                socket.emit('join', {room: currentRoom});
-                
-                // 更新UI
-                document.getElementById('chat-header').textContent = `正在与 ${userEmail} 聊天`;
-                document.getElementById('message-input').focus();
-                document.getElementById('message-input').placeholder = "输入消息...";
-                
-                // 加载历史消息
-                fetch(`/chat/history/${currentRoom}`)
-                    .then(response => response.json())
-                    .then(messages => {
-                        const messagesDiv = document.getElementById('messages');
-                        messagesDiv.innerHTML = '';
-                        messages.forEach(msg => {
-                            const messageElement = document.createElement('div');
-                            messageElement.className = `alert ${msg.sender_id == currentUserId ? 'alert-primary' : 'alert-secondary'} p-2 mb-2`;
-                            messageElement.style.maxWidth = '70%';
-                            messageElement.style.marginLeft = msg.sender_id == currentUserId ? 'auto' : '0';
-                            messageElement.innerHTML = `
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <strong>${msg.sender.email}</strong>
-                                    <small class="text-muted">${new Date(msg.timestamp).toLocaleTimeString()}</small>
-                                </div>
-                                <div>${msg.content}</div>
-                            `;
-                            messagesDiv.appendChild(messageElement);
-                        });
-                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                    });
+                startPrivateChat(userId, userEmail);
             });
         });
     }
@@ -222,23 +205,9 @@
         updateOnlineUsers(users);
     });
 
-    // 处理用户加入/离开
-    socket.on('user_joined', function(data) {
-        const messagesDiv = document.getElementById('messages');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'alert alert-info';
-        messageElement.textContent = `${data.user} 加入了聊天`;
-        messagesDiv.appendChild(messageElement);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    });
-
-    socket.on('user_left', function(data) {
-        const messagesDiv = document.getElementById('messages');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'alert alert-warning';
-        messageElement.textContent = `${data.user} 离开了聊天`;
-        messagesDiv.appendChild(messageElement);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    });
+    // 请求通知权限
+    if (Notification.permission !== 'granted') {
+        Notification.requestPermission();
+    }
 </script>
 {% endblock %}

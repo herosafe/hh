@@ -22,6 +22,10 @@ socketio = SocketIO(app)
 @socketio.on('connect')
 def handle_connect():
     if current_user.is_authenticated:
+        # 加入全局聊天室
+        join_room(GLOBAL_ROOM)
+        
+        # 更新在线用户列表
         online_users[current_user.id] = {
             'email': current_user.email,
             'factory': current_user.factory,
@@ -206,10 +210,14 @@ def on_leave(data):
     leave_room(room)
     send(f'{current_user.email} 离开了聊天室', room=room)
 
+# 全局聊天室名称
+GLOBAL_ROOM = 'global_chat'
+
 @socketio.on('message')
 def handle_message(data):
-    room = data['room']
+    room = data.get('room', GLOBAL_ROOM)
     message = data['message']
+    is_private = data.get('is_private', False)
     
     # 保存消息到数据库
     new_message = Message(
@@ -223,11 +231,21 @@ def handle_message(data):
     # 获取发送者信息
     sender = User.query.get(current_user.id)
     
-    send({
+    # 构造消息数据
+    message_data = {
         'sender': sender.email,
         'message': message,
-        'timestamp': new_message.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    }, room=room)
+        'timestamp': new_message.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        'is_private': is_private
+    }
+    
+    # 发送消息
+    if is_private:
+        # 私聊消息
+        send(message_data, room=room)
+    else:
+        # 全局消息
+        send(message_data, room=GLOBAL_ROOM)
 
 # 创建初始管理员账户
 def create_admin_user():
