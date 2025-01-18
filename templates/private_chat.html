@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-main">
+        <div class="chat-header">
+            <h2>私聊</h2>
+            <div class="participants">
+                {% for user in participants %}
+                <span class="participant">{{ user.email }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages">
+            {% set room_id = participants|map(attribute='id')|sort|join(',') %}
+            {% for message in ChatMessage.query.filter_by(room=room_id).order_by(ChatMessage.timestamp).all() %}
+            <div class="message">
+                <span class="message-user">{{ message.user.email }}</span>
+                <span class="message-time">{{ message.timestamp.strftime('%H:%M') }}</span>
+                <div class="message-content">{{ message.content }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="输入消息...">
+            <button id="send-button">发送</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+    const socket = io();
+    const roomId = "{{ participants|map(attribute='id')|sort|join(',') }}";
+    
+    // 加入私聊房间
+    socket.emit('join_room', {room: roomId});
+    
+    // 接收消息
+    socket.on('private_message', function(data) {
+        const messages = document.getElementById('chat-messages');
+        const message = document.createElement('div');
+        message.className = 'message';
+        
+        message.innerHTML = `
+            <span class="message-user">${data.user}</span>
+            <span class="message-time">${new Date().toLocaleTimeString()}</span>
+            <div class="message-content">${data.message}</div>
+        `;
+        
+        messages.appendChild(message);
+        messages.scrollTop = messages.scrollHeight;
+    });
+    
+    // 发送消息
+    const sendMessage = function() {
+        const input = document.getElementById('message-input');
+        const message = input.value.trim();
+        
+        if (message) {
+            socket.emit('send_message', {
+                message: message,
+                room: roomId
+            });
+            input.value = '';
+        }
+    };
+
+    // 按钮点击发送
+    document.getElementById('send-button').addEventListener('click', sendMessage);
+    
+    // 回车键发送
+    document.getElementById('message-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+</script>
+
+<style>
+    .chat-container {
+        display: flex;
+        height: 80vh;
+        max-width: 800px;
+        margin: 20px auto;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .chat-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .chat-header {
+        padding: 20px;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .participants {
+        margin-top: 10px;
+    }
+    
+    .participant {
+        display: inline-block;
+        margin-right: 10px;
+        padding: 5px 10px;
+        background: #f0f0f0;
+        border-radius: 15px;
+    }
+    
+    .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+    }
+    
+    .message {
+        margin-bottom: 15px;
+    }
+    
+    .message-user {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .message-time {
+        color: #999;
+        font-size: 0.8em;
+    }
+    
+    .message-content {
+        margin-top: 5px;
+        padding: 10px;
+        background: #f0f0f0;
+        border-radius: 5px;
+        display: inline-block;
+    }
+    
+    .chat-input {
+        padding: 20px;
+        border-top: 1px solid #ddd;
+        display: flex;
+    }
+    
+    #message-input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+    
+    #send-button {
+        margin-left: 10px;
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

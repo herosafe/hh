@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block head %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const socket = io();
+        const textarea = document.querySelector('textarea');
+        const fileId = {{ file.id }};
+        let isTyping = false;
+
+        // 加入编辑
+        socket.emit('join_edit', { file_id: fileId });
+
+        // 处理服务器消息
+        socket.on('message', function(data) {
+            if (data.type === 'system') {
+                showMessage(data.message);
+            } else if (data.type === 'error') {
+                alert(data.message);
+                window.location.href = '/collaborative_edit';
+            }
+        });
+
+        // 处理文本变化
+        socket.on('text_change', function(data) {
+            if (!isTyping && data.user !== '{{ current_user.email }}') {
+                textarea.value = data.content;
+            }
+        });
+
+        // 监听文本变化
+        textarea.addEventListener('input', function() {
+            isTyping = true;
+            socket.emit('text_change', {
+                file_id: fileId,
+                content: textarea.value
+            });
+            isTyping = false;
+        });
+
+        // 页面卸载时离开编辑
+        window.addEventListener('beforeunload', function() {
+            socket.emit('leave_edit', { file_id: fileId });
+        });
+
+        function showMessage(message) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'alert alert-info';
+            msgDiv.textContent = message;
+            document.querySelector('.card-body').prepend(msgDiv);
+            setTimeout(() => msgDiv.remove(), 3000);
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">
+                <i class="fas fa-edit"></i> 编辑文件 - {{ file.original_name }}
+                <small class="float-end">当前编辑人数: {{ file.active_editors }}</small>
+            </h3>
+        </div>
+        <div class="card-body">
+            {% if file.allow_edit or file.user_id == current_user.id %}
+                <form action="{{ url_for('save_file', file_id=file.id) }}" method="POST">
+                    <div class="mb-3">
+                        <textarea class="form-control" name="content" rows="20" style="font-family: monospace;" 
+                            {% if not file.allow_edit and file.user_id != current_user.id %}readonly{% endif %}>{{ content }}</textarea>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('collaborative_edit') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> 取消
+                        </a>
+                        {% if file.allow_edit or file.user_id == current_user.id %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+            {% else %}
+                <div class="card">
+                    <div class="card-body">
+                        <pre style="white-space: pre-wrap; font-family: monospace;">{{ content }}</pre>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="{{ url_for('collaborative_edit') }}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> 返回
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
