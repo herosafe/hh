@@ -140,10 +140,31 @@
         userSpan.className = 'message-user';
         userSpan.textContent = data.user;
         
+<<<<<<< HEAD
         // 创建时间
         const timeSpan = document.createElement('span');
         timeSpan.className = 'message-time';
         timeSpan.textContent = data.timestamp;
+=======
+        // 格式化时间
+        const timestamp = new Date(data.timestamp);
+        const formattedTime = timestamp.toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
+        messageElement.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <div>
+                    ${privateLabel}
+                    <strong>${data.sender}</strong>
+                </div>
+                <small class="text-muted">${formattedTime}</small>
+            </div>
+            <div>${data.message}</div>
+        `;
+>>>>>>> ab716ed1cd218d2bf2e70922c5926568ded2c459
         
         // 创建消息内容
         const contentDiv = document.createElement('div');
