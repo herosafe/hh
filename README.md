@@ -42,7 +42,7 @@
    ```bash
    python app.py
    ```
-4. 访问 http://localhost:5000
+4. 访问 http://localhost:8080
 
 ## 项目结构
 ```
